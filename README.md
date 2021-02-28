@@ -18,3 +18,5 @@
   * `terraform.rc`
 * files with name `example_override.tf` will **not** be ignored.
 
+... and new line.
+
