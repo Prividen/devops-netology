@@ -1,0 +1,184 @@
+#! /bin/bash
+
+echo "===< init test repo >==========="
+mkdir git-test
+cd git-test
+git init
+echo -e "--------------------------\n\n"
+
+
+
+echo "===< prepare initial commit >==="
+
+# Создайте в своем репозитории каталог branching 
+mkdir branching
+
+# и в нем два файла merge.sh и rebase.sh с содержимым
+cat > branching/merge.sh  << 'EOF'
+#!/bin/bash
+# display command line options
+
+count=1
+for param in "$*"; do
+    echo "\$* Parameter #$count = $param"
+    count=$(( $count + 1 ))
+done
+EOF
+cp branching/merge.sh branching/rebase.sh
+
+# Создадим коммит с описанием prepare for merge and rebase
+git add branching
+git commit -m "prepare for merge and rebase"
+echo -e "--------------------------\n\n"
+
+
+echo "===< 'Подготовка файла merge.sh' >==="
+# Создайте ветку git-merge
+git switch -c git-merge
+
+# Замените в ней содержимое файла merge.sh на
+cat > branching/merge.sh <<'EOF'
+#!/bin/bash
+# display command line options
+
+count=1
+for param in "$@"; do
+    echo "\$@ Parameter #$count = $param"
+    count=$(( $count + 1 ))
+done
+EOF
+
+# Создайте коммит merge: @ instead *
+git commit branching/merge.sh -m 'merge: @ instead *'
+
+# И разработчик подумал и решил внести еще одно изменение в merge.sh
+cat > branching/merge.sh <<'EOF'
+#!/bin/bash
+# display command line options
+
+count=1
+while [[ -n "$1" ]]; do
+    echo "Parameter #$count = $1"
+    count=$(( $count + 1 ))
+    shift
+done
+EOF
+
+# Создайте коммит 'merge: use shift'
+git commit branching/merge.sh -m 'merge: use shift'
+echo -e "--------------------------\n\n"
+
+
+echo "===< Изменим main >============="
+# кто-то, пока мы работали над веткой git-merge, изменил main
+# Для этого изменим содержимое файла rebase.sh
+git switch master
+cat > branching/rebase.sh <<'EOF'
+#!/bin/bash
+# display command line options
+
+count=1
+for param in "$@"; do
+    echo "\$@ Parameter #$count = $param"
+    count=$(( $count + 1 ))
+done
+
+echo "====="
+EOF
+
+git commit branching/rebase.sh -m 'rebase: @ instead *'
+echo -e "--------------------------\n\n"
+
+
+
+
+echo "===< Подготовка файла rebase.sh. >============="
+# при помощи команды git log найдем хэш коммита 'prepare for merge and rebase'
+MYHASH=$(git log --grep 'prepare for merge and rebase' --pretty=format:%H)
+
+# и выполним git checkout на него
+git checkout $MYHASH
+
+# Создадим ветку git-rebase основываясь на текущем коммите
+git switch -c git-rebase
+
+# И изменим содержимое файла rebase.sh...
+cat > branching/rebase.sh <<'EOF'
+#!/bin/bash
+# display command line options
+
+count=1
+for param in "$@"; do
+    echo "Parameter: $param"
+    count=$(( $count + 1 ))
+done
+
+echo "====="
+EOF
+
+# Отправим эти изменения в ветку git-rebase, с комментарием git-rebase 1
+git commit branching/rebase.sh -m "git-rebase 1"
+
+# И сделаем еще один коммит git-rebase 2
+sed -i -e 's/echo.*Parameter:.*/echo "Next parameter: $param"/' branching/rebase.sh
+git commit branching/rebase.sh -m "git-rebase 2"
+echo -e "--------------------------\n\n"
+
+
+
+
+echo "===< Merge >============="
+# Сливаем ветку git-merge в main
+git switch master
+VISUAL=cat git merge git-merge
+echo -e "--------------------------\n\n"
+
+
+
+echo "===< Rebase >============="
+# Переключаемся на ветку git-rebase
+git switch git-rebase
+
+# helper script for interactive rebase emulation
+cat > git-interactive-rebase <<'EOF'
+#! /bin/bash
+echo
+echo "~~< interactive rebase original >~~~~~~~~~~~~"
+head -5 $1
+echo ~~~~~~~~~~~~~~~~~~~~~
+echo 
+sed -i -r -e 's/pick\b(.+)\b(git-rebase 2)/fixup \1 \2/' $1
+echo "~~< interactive rebase edited >~~~~~~~~~~~~"
+head -5 $1
+echo ~~~~~~~~~~~~~~~~~~~~~
+echo 
+EOF
+chmod +x git-interactive-rebase
+
+# и выполняем git rebase -i main
+VISUAL=./git-interactive-rebase git rebase -i master
+rm -f git-interactive-rebase
+
+# Удалим метки, отдав предпочтение варианту...
+sed -i -e '/<<<</,/>>>>/d' -e '/for param/a\    echo "\\$@ Parameter #$count = $param"' branching/rebase.sh
+
+# сообщим гиту, что конфликт решен... и продолжим ребейз 
+git add branching/rebase.sh
+git rebase --continue
+
+# И опять получим конфликт.. 
+sed -i -e '/<<<</,/>>>>/d' -e '/for param/a\    echo "Next parameter: $param"' branching/rebase.sh
+
+# Далее опять сообщаем гиту о том, что конфликт разрешен....
+git add branching/rebase.sh
+VISUAL=cat git rebase --continue
+echo -e "--------------------------\n\n"
+
+# Теперь можно смержить ветку git-rebase в main без конфликтов 
+# и без дополнительного мерж-комита простой перемоткой...
+
+# but no.
+
+git checkout master
+VISUAL=cat git merge git-rebase
+
