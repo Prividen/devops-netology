@@ -13,18 +13,24 @@ output "aws_region" {
   value = data.aws_region.current.name
 }
 
-output "instance_private_ip" {
+output "instance_t1_private_ip" {
   description = "Private IP address of the EC2 instance"
-  value = aws_instance.test1.private_ip
+  value = aws_instance.test1.*.private_ip
 }
 
-output "instance_public_ip" {
+output "instance_t1_public_ip" {
   description = "Public IP address of the EC2 instance"
-  value = aws_instance.test1.public_ip
+  value = aws_instance.test1.*.public_ip
 }
 
-output "instance_subnet_id" {
+output "instance_t1_subnet_id" {
   description = "Subnet ID of the EC2 instance"
-  value = aws_instance.test1.subnet_id
+  value = aws_instance.test1.*.subnet_id
+}
+
+output "instance_t2_public_ip" {
+  value = {
+    for k, v in aws_instance.test2 : k => v.public_ip
+  }
 }
 
