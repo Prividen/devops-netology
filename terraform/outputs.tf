@@ -15,16 +15,16 @@ output "aws_region" {
 
 output "instance_private_ip" {
   description = "Private IP address of the EC2 instance"
-  value = aws_instance.test1.private_ip
+  value = module.ec2-instance.private_ip
 }
 
 output "instance_public_ip" {
   description = "Public IP address of the EC2 instance"
-  value = aws_instance.test1.public_ip
+  value = module.ec2-instance.public_ip
 }
 
 output "instance_subnet_id" {
   description = "Subnet ID of the EC2 instance"
-  value = aws_instance.test1.subnet_id
+  value = module.ec2-instance.subnet_id
 }
 
